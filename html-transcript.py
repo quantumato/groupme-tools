@@ -38,119 +38,125 @@ _HTML_FOOTER = """</div>
 
 
 class ImageCache(UserDict):
-    """Maps image URLs to local filenames."""
+	"""Maps image URLs to local filenames."""
 
-    def __init__(self, folder, initialdata={}):
-        UserDict.__init__(self, initialdata)
-        self._folder = folder
+	def __init__(self, folder, initialdata={}):
+		UserDict.__init__(self, initialdata)
+		self._folder = folder
 
-    def _save_image(self, url):
-        # Full disclosure, largely adapted from this SO answer:
-        # http://stackoverflow.com/a/16696317
-        local_file = url.split('/')[-1]
-        local = os.path.join(self._folder, local_file)
-        if os.path.exists(local):
-            return local_file
-        print 'Downloading image.'
-        resp = requests.get(url, stream=True)
-        with open(local, 'wb') as f:
-            for chunk in resp.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-                    f.flush()
-        return local_file
+	def _save_image(self, url):
+		# Full disclosure, largely adapted from this SO answer:
+		# http://stackoverflow.com/a/16696317
+		local_file = url.split('/')[-1]
+		local = os.path.join(self._folder, local_file)
+		if os.path.exists(local):
+			return local_file
+		print 'Downloading image.'
+		resp = requests.get(url, stream=True)
+		with open(local, 'wb') as f:
+			for chunk in resp.iter_content(chunk_size=1024):
+				if chunk:
+					f.write(chunk)
+					f.flush()
+		return local_file
 
-    def __getitem__(self, key):
-        try:
-            return UserDict.__getitem__(self, key)
-        except KeyError:
-            local = self._save_image(key)
-            self[key] = local
-            return local
+	def __getitem__(self, key):
+		try:
+			return UserDict.__getitem__(self, key)
+		except KeyError:
+			local = self._save_image(key)
+			self[key] = local
+			return local
 
 
 def write_html_transcript(messages, outfile, imgcache):
 
-    for i, message in enumerate(messages):
-        # Get variables
-        name = message[u'name']
-        time_obj = datetime.datetime.fromtimestamp(message[u'created_at'])
-        time_str = time_obj.strftime('%Y-%m-%d %H:%M')
-        text = message[u'text']
-        if text is None:
-            text = u''
-        system = message[u'system']
-        faves = message[u'favorited_by']
-        nlikes = faves if faves == 0 else len(faves)
-        pic = message[u'picture_url']
+	for i, message in enumerate(messages):
+		# Get variables
+		name = message[u'name']
+		time_obj = datetime.datetime.fromtimestamp(message[u'created_at'])
+		time_str = time_obj.strftime('%Y-%m-%d %H:%M')
+		text = message[u'text']
+		if text is None:
+			text = u''
+		if u'system' in message:
+			system = message[u'system']
+		else:
+			system = None
+		faves = message[u'favorited_by']
+		nlikes = faves if faves == 0 else len(faves)
+		if u'pic' in message:
+			pic = message[u'picture_url']
+		else:
+			pic = None
 
 
-        # Open div
-        outfile.write('<div class="message-container')
-        if system:
-            outfile.write(' system')
-        outfile.write('">')
+		# Open div
+		outfile.write('<div class="message-container')
+		if system:
+			outfile.write(' system')
+		outfile.write('">')
 
-        # Author
-        outfile.write('<div class="author">')
-        outfile.write(name.encode('utf-8'))
-        outfile.write('</div>')
+		# Author
+		outfile.write('<div class="author">')
+		outfile.write(name.encode('utf-8'))
+		outfile.write('</div>')
 
-        # Message span
-        outfile.write('<div class="message"><span class="message-span" title="%s">' % time_str)
-        outfile.write(text.encode('utf-8'))
-        outfile.write('</span></div>')
+		# Message span
+		outfile.write('<div class="message"><span class="message-span" title="%s">' % time_str)
+		outfile.write(text.encode('utf-8'))
+		outfile.write('</span></div>')
 
-        # Likes
-        if nlikes > 0:
-            outfile.write('<div class="likes">')
-            outfile.write("<img class='emojione' src='http://cdn.jsdelivr.net/emojione/assets/png/2764.png'>x</img>")
-            outfile.write('<span class="likes-count">%d</span>' % nlikes)
-            outfile.write('</div>')
+		# Likes
+		if nlikes > 0:
+			outfile.write('<div class="likes">')
+			outfile.write("<img class='emojione' src='http://cdn.jsdelivr.net/emojione/assets/png/2764.png'>x</img>")
+			outfile.write('<span class="likes-count">%d</span>' % nlikes)
+			outfile.write('</div>')
 
-        # Image
-        if pic:
-            local = imgcache[pic]
-            outfile.write('<img src="' + local + '" class="picture-message">')
+		# Image
+		if pic:
+			local = imgcache[pic]
+			outfile.write('<img src="' + local + '" class="picture-message">')
 
-        # Close div
-        outfile.write('</div>\n')
+		# Close div
+		outfile.write('</div>\n')
 
-        print '%04d/%04d messages processed' % (i, len(messages))
+		print '%04d/%04d messages processed' % (i, len(messages))
 
 
 def write_html(folder, messages, emoji=True):
-    imgcache = ImageCache(folder)
-    index_fn = os.path.join(folder, 'index.html')
-    shutil.copyfile('assets/groupme.css', os.path.join(folder, 'groupme.css'))
-    shutil.copyfile('assets/groupme.js', os.path.join(folder, 'groupme.js'))
-    with open(index_fn, 'w') as f:
-        f.write(_HTML_HEADER)
-        write_html_transcript(messages, f, imgcache)
-        f.write(_HTML_FOOTER)
+	imgcache = ImageCache(folder)
+	index_fn = os.path.join(folder, 'index.html')
+	shutil.copyfile('assets/groupme.css', os.path.join(folder, 'groupme.css'))
+	shutil.copyfile('assets/groupme.js', os.path.join(folder, 'groupme.js'))
+	with open(index_fn, 'w') as f:
+		f.write(_HTML_HEADER)
+		write_html_transcript(messages, f, imgcache)
+		f.write(_HTML_FOOTER)
 
 
 def main():
-    """
-    Usage: html-transcript.py filename.json html-output-folder
+	"""
+	Usage: html-transcript.py filename.json html-output-folder
 
-    Takes a JSON GroupMe transcript and writes a mostly offline HTML version of
-    your transcript.  Downloads all images sent over GroupMe, and uses a
-    Javascript library + CDN to render all of the Emoji.  GroupMe-specific
-    emoji will end up unrecognizable.
-    """
-    if len(sys.argv) < 3:
-        print cleandoc(main.__doc__)
-        sys.exit(1)
+	Takes a JSON GroupMe transcript and writes a mostly offline HTML version of
+	your transcript.  Downloads all images sent over GroupMe, and uses a
+	Javascript library + CDN to render all of the Emoji.  GroupMe-specific
+	emoji will end up unrecognizable.
+	"""
+	if len(sys.argv) < 3:
+		print cleandoc(main.__doc__)
+		sys.exit(1)
 
-    if not os.path.exists(sys.argv[2]):
-        os.mkdir(sys.argv[2])
-    trans_file = open(sys.argv[1])
-    transcript = json.load(trans_file)
-    trans_file.close()
+	if not os.path.exists(sys.argv[2]):
+		os.mkdir(sys.argv[2])
+	trans_file = open(sys.argv[1])
+	transcript = json.load(trans_file)
+	trans_file.close()
 
-    write_html(sys.argv[2], transcript)
+	write_html(sys.argv[2], transcript)
 
 
 if __name__ == '__main__':
-    main()
+	main()
